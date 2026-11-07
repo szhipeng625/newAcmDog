@@ -1,0 +1,29 @@
+.contest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+.contest-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.contest-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+.contest-card h3 {
+  font-size: 17px;
+  color: var(--ink);
+}
+.contest-meta {
+  display: flex;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.contest-status {
+  margin-top: 4px;
+}

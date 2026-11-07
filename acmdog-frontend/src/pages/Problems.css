@@ -1,0 +1,53 @@
+.page {
+  padding-top: 32px;
+}
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.page-head h1 {
+  font-size: 24px;
+}
+.page-head .sub {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 4px 0 0;
+}
+.search {
+  max-width: 260px;
+}
+.mono {
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 13px;
+}
+.title-link {
+  color: var(--ink);
+  font-weight: 550;
+}
+.title-link:hover {
+  color: var(--primary);
+}
+.muted {
+  color: var(--muted);
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  white-space: nowrap;
+}

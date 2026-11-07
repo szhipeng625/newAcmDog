@@ -1,0 +1,114 @@
+.author-page {
+  padding-bottom: 48px;
+}
+
+.author-hero {
+  text-align: center;
+  padding: 56px 24px 48px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--border);
+}
+.author-avatar {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 16px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+  box-shadow: 0 8px 24px rgba(59, 130, 196, 0.22);
+}
+.author-hero h1 {
+  font-size: 32px;
+  font-weight: 750;
+  letter-spacing: 0.5px;
+}
+.author-sub {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+  margin: 10px 0 0;
+}
+.author-brand {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.author-container {
+  max-width: 760px;
+  padding-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.author-section {
+  padding: 22px 26px;
+}
+.author-section-title {
+  font-size: 17px;
+  font-weight: 650;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--primary-soft);
+  display: inline-block;
+}
+.author-subtitle {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin: 16px 0 8px;
+}
+
+.author-entry {
+  display: flex;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+.author-entry:last-child {
+  border-bottom: none;
+}
+.author-when {
+  flex: 0 0 150px;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.author-what {
+  flex: 1;
+  color: var(--ink-2);
+  font-size: 14.5px;
+}
+.author-link {
+  margin-left: 8px;
+  font-size: 13.5px;
+}
+
+.medal {
+  font-weight: 650;
+  margin-left: 6px;
+}
+.medal-gold {
+  color: #d4a017;
+}
+.medal-silver {
+  color: #7a828e;
+}
+.medal-bronze {
+  color: #b0602c;
+}
+
+@media (max-width: 640px) {
+  .author-entry {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .author-when {
+    flex: none;
+  }
+}

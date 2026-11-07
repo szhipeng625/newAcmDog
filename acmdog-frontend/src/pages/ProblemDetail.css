@@ -1,0 +1,117 @@
+.problem-page {
+  padding-top: 28px;
+}
+.problem-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.problem-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.problem-head h1 {
+  font-size: 22px;
+}
+.detail-tags {
+  margin-bottom: 16px;
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  white-space: nowrap;
+}
+
+.problem-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .problem-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.statement {
+  padding: 22px 24px;
+}
+.statement-content {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--ink-2);
+}
+.statement-content h1,
+.statement-content h2,
+.statement-content h3 {
+  margin: 18px 0 8px;
+  font-size: 16px;
+}
+.statement-content p {
+  margin: 8px 0;
+}
+.statement-content pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  overflow: auto;
+  font-size: 13px;
+}
+.statement-content code {
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.samples {
+  margin-top: 18px;
+}
+.samples h3 {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+.sample-block {
+  background: #1a1d21;
+  color: #d7dce2;
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.editor-card {
+  padding: 16px;
+}
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.lang-select {
+  max-width: 140px;
+  width: auto;
+}
+.editor-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}

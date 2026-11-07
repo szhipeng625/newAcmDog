@@ -1,0 +1,193 @@
+.submissions-page {
+  max-width: 900px;
+}
+.back-link {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.back-link:hover {
+  color: var(--primary);
+}
+
+.sub-list {
+  overflow: hidden;
+}
+.sub-item-wrap {
+  border-bottom: 1px solid var(--border);
+}
+.sub-item-wrap:last-child {
+  border-bottom: none;
+}
+.sub-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: background 0.12s ease;
+}
+.sub-item:hover {
+  background: var(--surface-2);
+}
+.sub-verdict {
+  font-weight: 650;
+  min-width: 70px;
+}
+.sub-verdict.verdict-ac {
+  color: #1c8755;
+}
+.sub-verdict.verdict-wa,
+.sub-verdict.verdict-tle {
+  color: #c0392b;
+}
+.sub-verdict.verdict-ce {
+  color: #7c5cd6;
+}
+.sub-verdict.verdict-pending,
+.sub-verdict.verdict-judging {
+  color: #7a828e;
+}
+.sub-user {
+  color: var(--ink-2);
+  min-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub-lang {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.sub-time {
+  color: var(--muted);
+  font-size: 12.5px;
+  flex: 1;
+}
+.sub-cases {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.sub-arrow {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sub-detail {
+  background: var(--surface-2);
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+.sub-detail-loading {
+  color: var(--muted);
+  font-size: 13px;
+}
+.sub-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.sub-error {
+  color: #c0392b;
+  font-size: 13px;
+}
+.sub-error-pre {
+  background: #1a1d21;
+  color: #f0a0a0;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  overflow: auto;
+  font-size: 12.5px;
+  margin: 8px 0;
+  max-height: 240px;
+  font-family: var(--mono);
+}
+.sub-code {
+  margin-top: 8px;
+}
+.sub-code-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+.sub-code-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.sub-no-code {
+  color: var(--muted);
+  font-size: 13px;
+}
+.sub-cases-block {
+  margin-top: 16px;
+}
+.sub-cases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+.sub-case {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.sub-case-name {
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.sub-case-status {
+  font-weight: 600;
+  flex: 1;
+}
+.sub-case-status.verdict-ac {
+  color: #1c8755;
+}
+.sub-case-status.verdict-wa,
+.sub-case-status.verdict-tle {
+  color: #c0392b;
+}
+.sub-case-status.verdict-ce {
+  color: #7c5cd6;
+}
+.sub-case-status.verdict-pending,
+.sub-case-status.verdict-judging {
+  color: #7a828e;
+}
+.sub-case-time {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.sub-case-error {
+  color: #c0392b;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.sub-detail-summary-error {
+  margin: 8px 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.08);
+  border: 1px solid rgba(192, 57, 43, 0.25);
+  border-radius: 5px;
+}

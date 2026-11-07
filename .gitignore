@@ -1,0 +1,12 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.log
+.env
+.env.*
+*.bak
+*.bak.*
+build/
+.DS_Store
+shots/
