@@ -11,6 +11,7 @@ import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import Profile from './pages/Profile.jsx'
 import Author from './pages/Author.jsx'
+import HotProblems from './pages/HotProblems.jsx'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/author" element={<Author />} />
+        <Route path="/hot-problems" element={<HotProblems />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

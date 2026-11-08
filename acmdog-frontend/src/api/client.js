@@ -49,6 +49,9 @@ export const api = {
   // 题目
   problems: () => request('/api/cloud_problems'),
   problem: (id) => request(`/api/cloud_problem?id=${encodeURIComponent(id)}`),
+  // 热门题：按提交次数排行
+  hotProblems: (limit = 20) =>
+    request(`/api/hot_problems?limit=${encodeURIComponent(limit)}`),
 
   // 判题：提交代码（需登录），返回 {task_id, status}
   // body: { code, language, problemId }

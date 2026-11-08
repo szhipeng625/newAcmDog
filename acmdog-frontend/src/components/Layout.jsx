@@ -9,6 +9,7 @@ const navItems = [
   { to: '/problems', label: '题目' },
   { to: '/contests', label: '竞赛' },
   { to: '/sandbox', label: '沙盒' },
+  { to: '/hot-problems', label: '热门题' },
   { to: '/author', label: '作者' },
 ]
 

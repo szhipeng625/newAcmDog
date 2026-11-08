@@ -35,15 +35,9 @@ export function createMq(config) {
         await ch.assertQueue(config.mq.deadQueue, { durable: true });
         await ch.bindQueue(config.mq.deadQueue, config.mq.dlx, config.mq.deadQueue);
         await ch.assertQueue(config.mq.resultQueue, { durable: true });
-        await ch.assertQueue(config.mq.taskQueue, {
-          durable: true,
-          arguments: {
-            "x-dead-letter-exchange": config.mq.dlx,
-            "x-dead-letter-routing-key": config.mq.deadQueue,
-          },
-        }).catch((err) => {
-          // 队列已存在但参数不同：保持现状，绝不为了统一配置删队列丢消息
-          log.warn("task queue declared without DLX args", { queue: config.mq.taskQueue, error: err });
+        // 与旧版 Python 消费者(mq_consumer_orch.py)保持一致：oj.judge 仅 durable，不带 DLX 参数，避免 PRECONDITION_FAILED 冲突
+        await ch.assertQueue(config.mq.taskQueue, { durable: true }).catch((err) => {
+          log.warn("task queue declare failed", { queue: config.mq.taskQueue, error: err });
         });
         return ch;
       })().catch((err) => { pubChannelPromise = null; throw err; });

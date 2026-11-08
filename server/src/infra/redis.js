@@ -14,9 +14,9 @@ export function createRedis(config) {
     host: config.redis.host,
     port: config.redis.port,
     password: config.redis.password || undefined,
-    lazyConnect: true,
+    lazyConnect: false,
     maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
+    enableOfflineQueue: true,
     connectTimeout: 3000,
   };
   let client = null;
