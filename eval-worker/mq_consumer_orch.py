@@ -156,7 +156,7 @@ FILER_BASE = "http://43.157.53.29:8888"
 # ==================== Redis 20 题 LRU 测试数据缓存 ====================
 _REDIS_HOST = "127.0.0.1"
 _REDIS_PORT = 6382
-_REDIS_PASS = "hot_redis_2026"
+# 密码只从环境变量读，不要写死在源码里（_pd_redis 会取 HOT_REDIS_PASSWORD）
 _PD_MAX = 20                       # 最多缓存 20 道题
 _PD_KEY = "pdata:%s"               # 每题一个 key：文件名 -> base64 内容 的 JSON
 _PD_LRU = "pdata:lru"              # zset：member=pid, score=最后访问时间戳
@@ -740,13 +740,22 @@ def poll_result(task_id, timeout=60):
         time.sleep(0.3)
     return {"task_id": task_id, "status": "SE", "error": "orchestrator poll timeout"}
 
+def _pids_for(lang):
+    """JVM 要开 GC/JIT/编译线程，进程配额必须比 C/C++ 高一大截。"""
+    if lang == "java":
+        return 96
+    if lang in ("py", "python", "python3"):
+        return 16
+    return 32
+
+
 # ==================== Compile User Code ====================
-def compile_code(code, lang, work_dir):
+def compile_code(code, lang, work_dir, mem_bytes=0):
     """Compile user code inside data_prep cgroup to yield CPU to judges."""
     with DataPrepPreempt():
-        return _compile_code_inner(code, lang, work_dir)
+        return _compile_code_inner(code, lang, work_dir, mem_bytes)
 
-def _compile_code_inner(code, lang, work_dir):
+def _compile_code_inner(code, lang, work_dir, mem_bytes=0):
     src_map = {"c": "main.c", "cpp": "main.cpp", "cc": "main.cpp",
                "go": "main.go", "py": "main.py", "python": "main.py",
                "python3": "main.py", "java": "Main.java"}
@@ -764,9 +773,11 @@ def _compile_code_inner(code, lang, work_dir):
         f.write(code)
     # Python：解释执行，生成统一入口 wrapper
     if lang in ("py", "python", "python3"):
+        # -B 不写 __pycache__（nobody 写不进 work_dir），-u 不缓冲，超时被杀也能拿到已输出内容
         wrapper = os.path.join(work_dir, "user_bin")
         with open(wrapper, "w") as f:
-            f.write("#!/bin/sh\nexec python3 " + os.path.join(work_dir, "main.py") + "\n")
+            f.write("#!/bin/sh\nexec python3 -B -u "
+                    + os.path.join(work_dir, "main.py") + "\n")
         os.chmod(wrapper, 0o755)
         return wrapper, None
     try:
@@ -782,9 +793,17 @@ def _compile_code_inner(code, lang, work_dir):
             return None, r.stderr.decode("utf-8", errors="replace")[:4096]
         # Java：编译产出 Main.class，生成统一入口 wrapper
         if lang == "java":
+            # JVM 默认按宿主物理内存挑堆，会直接撞穿 cgroup memory.max 被 OOM kill，
+            # 必须显式 -Xmx；同时压掉 hsperfdata 写入和多余的 GC/JIT 线程。
+            heap_mb = 128
+            if mem_bytes > 0:
+                heap_mb = max(32, int(mem_bytes * 0.5) // (1024 * 1024))
             wrapper = os.path.join(work_dir, "user_bin")
             with open(wrapper, "w") as f:
-                f.write("#!/bin/sh\nexec java -Xss64m -cp " + work_dir + " Main\n")
+                f.write("#!/bin/sh\nexec java "
+                        "-XX:-UsePerfData -XX:+UseSerialGC -XX:ActiveProcessorCount=2 "
+                        "-Dfile.encoding=UTF-8 -Xss16m -Xmx%dm -cp %s Main\n"
+                        % (heap_mb, work_dir))
             os.chmod(wrapper, 0o755)
             return wrapper, None
         return os.path.join(work_dir, "user_bin"), None
@@ -944,7 +963,11 @@ def process_task(body):
     pdata = _get_problem_meta(problem_id)
     spj_binary, entry_binary, judge_mode = _prepare_checker(pdata, data_dir)
 
-    cpu_ms = min(time_ms, 10000)
+    # 运行时启动的固定开销不占题目时限：JVM 启动+类加载约 150~400ms CPU，
+    # 直接计入的话 1s 的题 Java 只剩一半。补贴是固定值，不按倍数放大。
+    startup_ms = {"java": 300, "py": 60, "python": 60, "python3": 60,
+                  "go": 20}.get(lang, 0)
+    cpu_ms = min(time_ms, 10000) + startup_ms
     mem_bytes = min(mem_mb * 1024 * 1024, 536870912)
 
     # 2. Compile user code（函数式判题编译为共享库 user.so）
@@ -957,7 +980,7 @@ def process_task(body):
             return {"task_id": task_id, "status": "SE", "error": "题目入口缺失（entry 不存在或编译失败）"}
         binary, err = compile_shared(code, lang, work_dir)
     else:
-        binary, err = compile_code(code, lang, work_dir)
+        binary, err = compile_code(code, lang, work_dir, mem_bytes)
     if err:
         print(f"[consumer] {task_id} -> CE", flush=True)
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -1049,7 +1072,7 @@ def process_task(body):
                 "expected_output_file": "",
                 "cpu_limit_ms": cpu_ms,
                 "mem_limit_bytes": mem_bytes,
-                "max_pids": 32,
+                "max_pids": _pids_for(lang),
             }
             result = _run_orch(orch_task, sub_task_id, timeout=cpu_ms // 1000 * 3 + 10)
             st = result.get("status", "SE")
@@ -1098,7 +1121,7 @@ def process_task(body):
                 "expected_output_file": expected_file,
                 "cpu_limit_ms": cpu_ms,
                 "mem_limit_bytes": mem_bytes,
-                "max_pids": 32,
+                "max_pids": _pids_for(lang),
             }
             result = _run_orch(orch_task, sub_task_id, timeout=cpu_ms // 1000 * 3 + 10)
             st = result.get("status", "SE")

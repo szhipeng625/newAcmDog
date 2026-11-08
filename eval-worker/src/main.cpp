@@ -12,6 +12,8 @@
 #include <sys/resource.h>
 #include <unistd.h>
 #include <cstring>
+#include <cstdlib>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 
@@ -34,10 +36,40 @@ struct EvalTask {
     std::string checker;   // diff（默认，输出比对）/ exitcode（SPJ：退出码 0=AC）
 };
 
+// task_id 会拼进 /tmp 目录名，限制字符集，避免 ../ 之类穿越出工作目录
+static bool valid_task_id(const std::string& id) {
+    if (id.empty() || id.size() > 64) return false;
+    for (char c : id) {
+        unsigned char u = static_cast<unsigned char>(c);
+        if (!(std::isalnum(u) || c == '_' || c == '-')) return false;
+    }
+    return true;
+}
+
+// 默认清理每个任务的临时目录；排查现场时设 KEEP_EVAL_TMP=1 保留
+static void cleanup_tmp(const std::string& dir) {
+    if (getenv("KEEP_EVAL_TMP") != nullptr) return;
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+}
+
+// cgroup v2 的 OOM 计数：命中说明进程是被内存限制杀掉的，应判 MLE 而非 RE
+static uint64_t read_oom_kills(const std::string& cg_path) {
+    std::ifstream f(cg_path + "/memory.events");
+    std::string key;
+    uint64_t val = 0;
+    while (f >> key >> val) {
+        if (key == "oom_kill") return val;
+    }
+    return 0;
+}
+
 EvalTask parse_task(const std::string& body) {
     auto j = json::parse(body);
     EvalTask t;
     t.task_id         = j.at("task_id").get<std::string>();
+    if (!valid_task_id(t.task_id))
+        throw std::runtime_error("invalid task_id: allowed [A-Za-z0-9_-], max 64 chars");
     t.user_binary     = j.at("user_binary").get<std::string>();
     t.problem_data    = j.value("problem_data", "");
     t.cpu_limit_ms    = j.value("cpu_limit_ms", 1000u);
@@ -109,14 +141,14 @@ json run_eval(const EvalTask& task) {
         cg_path = CgroupManager::create_judge(task.task_id, task.cpu_limit_ms,
                                         task.mem_limit_bytes, task.max_pids);
     } catch (const std::exception& e) {
-        // fs::remove_all(tmp_dir); // DEBUG
+        cleanup_tmp(tmp_dir);
         return {{"task_id", task.task_id}, {"status", "SE"}, {"error", e.what()}};
     }
 
     pid_t pid = fork();
     if (pid < 0) {
         CgroupManager::destroy(cg_path);
-        // fs::remove_all(tmp_dir); // DEBUG
+        cleanup_tmp(tmp_dir);
         return {{"task_id", task.task_id}, {"status", "SE"}, {"error", "fork failed"}};
     }
 
@@ -141,31 +173,37 @@ json run_eval(const EvalTask& task) {
     int wstatus = 0;
     bool wall_timeout = false;
 
+    // wait4 取的是这一个子进程的 rusage。原先用 getrusage(RUSAGE_CHILDREN)，
+    // 那是本进程所有已回收子进程的累计值，从第二个任务起就会把前面任务的
+    // CPU 时间和 RSS 一并算进来，导致 CPU/MLE 误判。
+    struct rusage ru{};
+    bool have_ru = false;
     while (true) {
-        pid_t ret = waitpid(pid, &wstatus, WNOHANG);
-        if (ret == pid) break;
+        pid_t ret = wait4(pid, &wstatus, WNOHANG, &ru);
+        if (ret == pid) { have_ru = true; break; }
         if (ret < 0) break;
         if (std::chrono::steady_clock::now() >= deadline) {
             kill(pid, SIGKILL);
-            waitpid(pid, &wstatus, 0);
+            if (wait4(pid, &wstatus, 0, &ru) == pid) have_ru = true;
             wall_timeout = true;
             break;
         }
         usleep(1000);
     }
 
-    // Collect resource usage via getrusage (reliable, no cgroup delegation needed)
-    struct rusage ru;
-    getrusage(RUSAGE_CHILDREN, &ru);
-    uint64_t cpu_ns = (uint64_t)(ru.ru_utime.tv_sec + ru.ru_stime.tv_sec) * 1000000000ULL
-                    + (uint64_t)(ru.ru_utime.tv_usec + ru.ru_stime.tv_usec) * 1000ULL;
-    uint64_t mem_bytes = (uint64_t)ru.ru_maxrss * 1024ULL;  // maxrss is in KB on Linux
+    uint64_t cpu_ns = 0;
+    uint64_t mem_bytes = 0;
+    if (have_ru) {
+        cpu_ns = (uint64_t)(ru.ru_utime.tv_sec + ru.ru_stime.tv_sec) * 1000000000ULL
+               + (uint64_t)(ru.ru_utime.tv_usec + ru.ru_stime.tv_usec) * 1000ULL;
+        mem_bytes = (uint64_t)ru.ru_maxrss * 1024ULL;  // maxrss is in KB on Linux
+    }
 
-    // Also try cgroup stats as supplementary (may be 0 if delegation unavailable)
+    // cgroup 统计更准（覆盖所有后代进程），可用时优先
     auto cg_usage = CgroupManager::read_usage(cg_path);
+    uint64_t oom_kills = read_oom_kills(cg_path);
     CgroupManager::destroy(cg_path);
 
-    // Prefer cgroup values if available, fall back to getrusage
     if (cg_usage.cpu_ns > 0) cpu_ns = cg_usage.cpu_ns;
     if (cg_usage.mem_bytes > 0) mem_bytes = cg_usage.mem_bytes;
 
@@ -185,8 +223,10 @@ json run_eval(const EvalTask& task) {
     result["mem_bytes"] = mem_bytes;
     result["exit_code"] = WIFEXITED(wstatus) ? WEXITSTATUS(wstatus) : -1;
 
-    bool cpu_exceeded = (cpu_ns > static_cast<uint64_t>(task.cpu_limit_ms) * 1000000000ULL);
-    bool mem_exceeded = (mem_bytes > task.mem_limit_bytes);
+    // 1ms = 1e6 ns。原实现乘的是 1e9，相当于把限制放大 1000 倍，CPU 超时几乎不会命中。
+    bool cpu_exceeded = (cpu_ns > static_cast<uint64_t>(task.cpu_limit_ms) * 1000000ULL);
+    // OOM 命中时 memory.peak 可能刚好等于上限而不严格大于，单靠 mem_bytes 比不出来
+    bool mem_exceeded = (mem_bytes > task.mem_limit_bytes) || (oom_kills > 0);
 
     if (wall_timeout || cpu_exceeded) {
         result["status"] = "TLE";
@@ -218,7 +258,7 @@ json run_eval(const EvalTask& task) {
         }
     }
 
-    // fs::remove_all(tmp_dir); // DEBUG
+    cleanup_tmp(tmp_dir);
     return result;
 }
 

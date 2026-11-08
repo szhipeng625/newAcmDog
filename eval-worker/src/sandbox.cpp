@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/resource.h>
+#include <grp.h>
 #include <fcntl.h>
 #include <cstdio>
 #include <cstdlib>
@@ -86,6 +87,36 @@ static int install_seccomp() {
         SCMP_SYS(ftruncate),
         SCMP_SYS(fsync), SCMP_SYS(fdatasync),
         SCMP_SYS(getrlimit),
+
+        // JVM / CPython 额外依赖。用 __SNR_ 宏做存在性判断：老版本 libseccomp
+        // 不认识较新的系统调用时宏不存在，跳过而不是编译失败。
+#ifdef __SNR_eventfd2
+        SCMP_SYS(eventfd2),
+#endif
+#ifdef __SNR_memfd_create
+        SCMP_SYS(memfd_create),
+#endif
+#ifdef __SNR_setpriority
+        SCMP_SYS(setpriority),
+#endif
+#ifdef __SNR_getpriority
+        SCMP_SYS(getpriority),
+#endif
+#ifdef __SNR_sched_setscheduler
+        SCMP_SYS(sched_setscheduler),
+#endif
+#ifdef __SNR_sched_setparam
+        SCMP_SYS(sched_setparam),
+#endif
+#ifdef __SNR_sched_rr_get_interval
+        SCMP_SYS(sched_rr_get_interval),
+#endif
+#ifdef __SNR_timerfd_create
+        SCMP_SYS(timerfd_create), SCMP_SYS(timerfd_settime), SCMP_SYS(timerfd_gettime),
+#endif
+#ifdef __SNR_futex_waitv
+        SCMP_SYS(futex_waitv),
+#endif
     };
 
     for (int sys : allowed) {
@@ -101,25 +132,54 @@ static int install_seccomp() {
     return rc;
 }
 
+// 沙箱内的最小环境：只保留解释器/运行时真正需要的变量。
+// 宿主上的 token、代理、CI 变量一律不透传；语言运行时都通过绝对路径
+// 直接 exec，不依赖 PATH 查找。
+static const char* kSandboxEnv[] = {
+    "PATH=/usr/local/bin:/usr/bin:/bin",
+    "HOME=/tmp",
+    "TMPDIR=/tmp",
+    "LANG=C.UTF-8",
+    "LC_ALL=C.UTF-8",
+    "PYTHONIOENCODING=utf-8",
+    "PYTHONDONTWRITEBYTECODE=1",   // 与 python -B 双保险，nobody 写不进 __pycache__
+    nullptr,
+};
+
 // 新 PID namespace 中的用户进程（namespace 内首个进程）
 [[noreturn]] static void grandchild_main(const SandboxConfig& config) {
-    // 父进程（命名空间守护进程）退出时由内核强制 SIGKILL，防止孤儿残留
-    prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0);
     // 挂载本 namespace 专属 /proc（Go / JVM / CPython 运行时必需）
     if (mount("proc", "/proc", "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL) != 0) {
         perror("[sandbox] mount /proc");
         // 非致命：C/C++ 不依赖；缺 /proc 时 Go/JVM 会自行报错
     }
-    // 降权到 nobody (uid=65534, gid=65534)
+    // 彻底降权：先清 supplementary groups，再 setgid/setuid（顺序不能反）
+    if (setgroups(0, nullptr) != 0) {
+        perror("[sandbox] setgroups");
+        _exit(126);
+    }
     if (setgid(65534) != 0 || setuid(65534) != 0) {
         perror("[sandbox] drop privileges");
         _exit(126);
     }
-    // wall-clock 超时辅助保护
+    // setuid 会让内核清除 PR_SET_PDEATHSIG，所以必须放在降权之后；
+    // 否则命名空间守护进程先死时子进程会变成孤儿，继续占着 cgroup 和 PID 配额。
+    prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0);
+    // 设置与检查之间父进程可能刚好退出，补一次判断消除竞态
+    if (getppid() == 1) {
+        _exit(126);
+    }
+    // CPU 时间兜底（秒级粒度；精确判定由上层读 cgroup cpu.stat 完成）
     if (config.cpu_limit_ms > 0) {
         struct rlimit rl;
         rl.rlim_cur = rl.rlim_max = (config.cpu_limit_ms + 999) / 1000 + 1;
         setrlimit(RLIMIT_CPU, &rl);
+    }
+    // 输出炸弹防御：单个文件写入超过 256MB 触发 SIGXFSZ
+    {
+        struct rlimit rf;
+        rf.rlim_cur = rf.rlim_max = 256ULL * 1024 * 1024;
+        setrlimit(RLIMIT_FSIZE, &rf);
     }
     // seccomp 过滤器（不可逆，必须在 exec 前最后一步）
     if (install_seccomp() != 0) {
@@ -133,10 +193,20 @@ static int install_seccomp() {
         argv.push_back(a.c_str());
     }
     argv.push_back(nullptr);
-    execv(config.user_binary.c_str(), const_cast<char* const*>(argv.data()));
+
+    std::vector<char*> envp;
+    for (const char* e : kSandboxEnv) {
+        if (e) envp.push_back(const_cast<char*>(e));
+    }
+
+    execve(config.user_binary.c_str(),
+           const_cast<char* const*>(argv.data()),
+           envp.data());
     // exec 失败才会到这里
-    fprintf(stderr, "[sandbox] execv(%s) failed: %s\n",
-            config.user_binary.c_str(), strerror(errno));
+    int exec_err = errno;
+    fprintf(stderr, "[sandbox] execve(%s) failed: %s%s\n",
+            config.user_binary.c_str(), strerror(exec_err),
+            exec_err == ENOEXEC ? " (脚本解释器缺失或 shebang 不可执行?)" : "");
     _exit(127);
 }
 
