@@ -10,3 +10,4 @@ __pycache__/
 build/
 .DS_Store
 shots/
+.vscode/
