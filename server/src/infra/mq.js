@@ -1,4 +1,7 @@
 import amqp from "amqplib";
+import { logger } from "../core/logger.js";
+
+const log = logger.child("mq");
 
 /**
  * RabbitMQ 封装。
@@ -14,7 +17,7 @@ export function createMq(config) {
     if (!connPromise) {
       connPromise = amqp.connect(config.mq.url, { heartbeat: config.mq.heartbeat })
         .then((conn) => {
-          conn.on("error", (err) => console.error("[mq] connection error:", err.message));
+          conn.on("error", (err) => log.error("connection error", { error: err }));
           conn.on("close", () => { connPromise = null; pubChannelPromise = null; });
           return conn;
         })
@@ -40,7 +43,7 @@ export function createMq(config) {
           },
         }).catch((err) => {
           // 队列已存在但参数不同：保持现状，绝不为了统一配置删队列丢消息
-          console.warn("[mq] task queue declared without DLX args:", err.message);
+          log.warn("task queue declared without DLX args", { queue: config.mq.taskQueue, error: err });
         });
         return ch;
       })().catch((err) => { pubChannelPromise = null; throw err; });
@@ -70,11 +73,16 @@ export function createMq(config) {
       await ch.prefetch(config.mq.prefetch);
       await ch.consume(queueName, async (msg) => {
         if (!msg) return;
+        let payload;
         try {
-          await handler(JSON.parse(msg.content.toString("utf8")));
+          payload = JSON.parse(msg.content.toString("utf8"));
+          // 把消息里的 task_id 注入日志上下文，消费链路的所有日志都能串起来
+          await logger.runWith({ task_id: payload?.task_id || "" }, () => handler(payload));
           ch.ack(msg);
         } catch (err) {
-          console.error(`[mq] handler for ${queueName} failed:`, err.message);
+          log.error("message handler failed", {
+            queue: queueName, task_id: payload?.task_id, error: err,
+          });
           ch.nack(msg, false, false);
         }
       });

@@ -1,5 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { logger } from "../core/logger.js";
+
+const log = logger.child("problem");
 
 /**
  * 题目服务：元数据 + 测试数据。
@@ -58,12 +61,12 @@ export function createProblemService(app) {
     try {
       return normalizeProblem(await filer.problemJson(numeric));
     } catch (err) {
-      console.warn(`[problem] filer meta ${pid} failed: ${err.message}`);
+      log.warn("filer meta failed", { problem_id: pid, error: err });
     }
     try {
       return normalizeProblem(await middleware.problem(numeric));
     } catch (err) {
-      console.warn(`[problem] middleware meta ${pid} failed: ${err.message}`);
+      log.warn("middleware meta failed", { problem_id: pid, error: err });
     }
     return null;
   }
@@ -146,12 +149,14 @@ export function createProblemService(app) {
         if (Object.keys(files).length) {
           await writeFiles(dir, files);
           await redis.putProblemData(numeric, files);
-          console.log(`[problem] ${pid} data from object storage (${Object.keys(files).length} files)`);
+          log.info("test data loaded from object storage", {
+            problem_id: pid, files: Object.keys(files).length,
+          });
           return sortedCases(dir);
         }
       }
     } catch (err) {
-      console.warn(`[problem] filer data ${pid} failed: ${err.message}`);
+      log.warn("filer test data failed", { problem_id: pid, error: err });
     }
 
     try {
@@ -169,7 +174,7 @@ export function createProblemService(app) {
         return sortedCases(dir);
       }
     } catch (err) {
-      console.warn(`[problem] db testcases ${pid} failed: ${err.message}`);
+      log.warn("db testcases failed", { problem_id: pid, error: err });
     }
 
     const info = await meta(numeric);
@@ -197,7 +202,7 @@ export function createProblemService(app) {
     try {
       for (const p of await navList()) titles.set(Number(p.id), p.title || "");
     } catch (err) {
-      console.warn("[problem] hot titles lookup failed:", err.message);
+      log.warn("hot titles lookup failed", { error: err });
     }
     return items.map((it) => ({
       id: it.id,

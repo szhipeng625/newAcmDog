@@ -1,3 +1,7 @@
+import { logger } from "./logger.js";
+
+const log = logger.child("http");
+
 export class HttpError extends Error {
   constructor(status, message, extra = {}) {
     super(message);
@@ -36,7 +40,11 @@ export function httpMiddleware() {
       const status = err.status || 500;
       ctx.status = status;
       ctx.body = { error: err.message || "internal error", ...(err.extra || {}) };
-      if (status >= 500) console.error("[http]", ctx.method, ctx.path, err);
+      if (status >= 500) {
+        log.error("unhandled http error", {
+          method: ctx.method, path: ctx.path, status, error: err,
+        });
+      }
     }
   };
 }

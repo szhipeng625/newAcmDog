@@ -12,6 +12,7 @@ process.env.JUDGE_WORK_ROOT = os.tmpdir();
 process.env.RESULT_TTL_MS = "60000";
 
 const { createApp } = await import("../src/app.js");
+const { logger } = await import("../src/core/logger.js");
 
 test("HTTP 冒烟", async (t) => {
   const app = await createApp();
@@ -83,5 +84,34 @@ test("HTTP 冒烟", async (t) => {
     const res = await fetch(`${base}/api/anime/status`);
     assert.ok([502, 200].includes(res.status), `unexpected ${res.status}`);
     if (res.status === 502) assert.match((await res.json()).error, /动漫智能体不可用/);
+  });
+
+  await t.test("访问日志：request_id 回显、状态与耗时入账、查询参数脱敏", async () => {
+    const records = [];
+    logger.configure({
+      console: false, level: "debug", dir: "",
+      sink: (level, line, record) => records.push(record),
+    });
+    try {
+      const traced = await fetch(`${base}/api/cloud_judge_result?task_id=trace`, {
+        headers: { "X-Request-ID": "trace-123" },
+      });
+      assert.equal(traced.status, 200);
+      assert.equal(traced.headers.get("x-request-id"), "trace-123");
+
+      const access = records.find((r) => r.module === "http" && r.path.includes("/api/cloud_judge_result"));
+      assert.ok(access, "应产生一条 HTTP 访问日志");
+      assert.equal(access.request_id, "trace-123");
+      assert.equal(access.method, "GET");
+      assert.equal(access.status, 200);
+      assert.equal(typeof access.duration_ms, "number");
+
+      await fetch(`${base}/api/cloud_judge_result?task_id=t&token=abcdef123456`);
+      const last = records.filter((r) => r.module === "http").at(-1);
+      assert.match(last.path, /token=\*\*\*/);
+      assert.equal(last.path.includes("abcdef123456"), false, "token 不能明文出现在日志里");
+    } finally {
+      logger.configure({ console: false, dir: "", level: "info" });
+    }
   });
 });

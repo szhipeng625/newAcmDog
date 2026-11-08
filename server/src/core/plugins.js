@@ -1,3 +1,7 @@
+import { logger } from "./logger.js";
+
+const log = logger.child("plugin");
+
 /**
  * 插件机制。
  *
@@ -26,7 +30,7 @@ export function enablePlugins(app) {
       await instance.install(app, options);
     }
     app.plugins.set(instance.name, instance);
-    console.log(`[plugin] ${instance.name} registered`);
+    log.info("plugin registered", { plugin: instance.name });
     return instance;
   };
 
@@ -58,7 +62,7 @@ export function enablePlugins(app) {
         try {
           await plugin.close();
         } catch (err) {
-          console.error(`[plugin] ${plugin.name} close failed:`, err.message);
+          log.error("plugin close failed", { plugin: plugin.name, error: err });
         }
       }
     }

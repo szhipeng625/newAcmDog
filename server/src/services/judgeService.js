@@ -2,9 +2,11 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { badRequest, conflict, notFound } from "../core/http.js";
+import { logger } from "../core/logger.js";
 import { cpuBudgetMs, normalizeLang } from "../plugins/sandbox/languages.js";
 import { normalizeText } from "../plugins/sandbox/normalize.js";
 
+const log = logger.child("judge");
 const MAX_MEM = 512 * 1024 * 1024;
 const randomHex = (n) => crypto.randomBytes(n).toString("hex");
 
@@ -43,6 +45,8 @@ export function createJudgeService(app, { problems, resultHub }) {
     if (!info) throw notFound("题目不存在");
 
     const taskId = `web_${randomHex(6)}`;
+    // 提交入口在 HTTP 上下文里，补上 task_id 后本次请求剩余日志都能关联到这次判题
+    logger.setContext({ task_id: taskId });
     const storeKey = makeStoreKey(user.username, source);
 
     const dup = await mysql.query(
@@ -51,6 +55,9 @@ export function createJudgeService(app, { problems, resultHub }) {
       [storeKey],
     ).catch(() => []);
     if (dup.length) {
+      log.info("duplicate submission rejected", {
+        task_id: taskId, username: user.username, problem_id: pid,
+      });
       throw conflict("不能重复提交相同的代码", {
         duplicate: true,
         submission_no: dup[0].submission_no,
@@ -62,7 +69,7 @@ export function createJudgeService(app, { problems, resultHub }) {
        VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
       [taskId, user.username, pid, info.title, Number(contestId) || 0, lang, source],
     ).catch((err) => {
-      console.error("[judge] insert submit failed:", err.message);
+      log.error("insert submit failed", { task_id: taskId, error: err });
       return null;
     });
 
@@ -91,6 +98,12 @@ export function createJudgeService(app, { problems, resultHub }) {
       mem_limit_bytes: Math.min(info.memMb * 1024 * 1024, MAX_MEM),
     });
 
+    log.info("submission accepted", {
+      task_id: taskId, username: user.username, problem_id: pid,
+      contest_id: meta.contest_id, language: lang,
+      cpu_limit_ms: Math.min(info.timeMs, config.sandbox.cpuMsMax),
+      queue: config.mq.taskQueue,
+    });
     return { task_id: taskId, status: "pending" };
   }
 
@@ -209,7 +222,15 @@ export function createJudgeService(app, { problems, resultHub }) {
     return run;
   }
 
+  /** 注入 task_id 上下文：逐点日志、落库日志、异常日志全都归属于同一次判题。 */
   async function judgeOne(task) {
+    return logger.runWith(
+      { task_id: task.task_id, username: task.username || "" },
+      () => judgeOneImpl(task),
+    );
+  }
+
+  async function judgeOneImpl(task) {
     const taskId = task.task_id;
     const pid = Number(task.problem_id);
     const lang = normalizeLang(task.language);
@@ -234,7 +255,7 @@ export function createJudgeService(app, { problems, resultHub }) {
       }
 
       const checker = await prepareChecker(info, workDir);
-      if (checker.warning) console.warn(`[judge] ${taskId}: ${checker.warning}`);
+      if (checker.warning) log.warn("checker fallback", { mode: checker.mode, detail: checker.warning });
 
       status(taskId, {
         status: "judging", phase: "running", total_cases: cases.length,
@@ -256,6 +277,9 @@ export function createJudgeService(app, { problems, resultHub }) {
         totalCpu += r.cpu_ns || 0;
         peakMem = Math.max(peakMem, r.mem_bytes || 0);
         results.push(caseEntry(testcase.name, r));
+        log.debug("case finished", {
+          case_name: testcase.name, status: r.status, cpu_ms: r.cpu_ns ? Math.round(r.cpu_ns / 1e6) : 0,
+        });
 
         status(taskId, {
           status: "judging",
@@ -281,12 +305,22 @@ export function createJudgeService(app, { problems, resultHub }) {
         cases: results,
         error: firstFail ? (firstFail.error || defaultError(firstFail.status)) : "",
       };
-      console.log(`[judge] ${taskId} -> ${verdict.status} (${verdict.ac_count}/${verdict.total_cases})`);
+      log.info("judge finished", {
+        status: verdict.status,
+        ac_count: verdict.ac_count,
+        total_cases: verdict.total_cases,
+        cpu_ms: verdict.cpu_ms,
+        mem_mb: verdict.mem_mb,
+        problem_id: pid,
+        language: lang,
+      });
       return verdict;
     } catch (err) {
       if (err.isCompileError) {
+        log.warn("compilation failed", { language: lang, error: err });
         return { task_id: taskId, problem_id: pid, status: "CE", error: err.message };
       }
+      log.error("judge failed", { error: err });
       return { task_id: taskId, problem_id: pid, status: "SE", error: err.message };
     } finally {
       await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
@@ -303,17 +337,17 @@ export function createJudgeService(app, { problems, resultHub }) {
     return mq.consume(config.mq.taskQueue, async (task) => {
       if (task.type) return; // 竞赛数据准备/清理等控制消息不走判题
       if (!task.code || !task.task_id) {
-        console.warn("[judge] skip malformed task", task.task_id);
+        log.warn("skip malformed task", { task_id: task.task_id || "", type: task.type || "" });
         return;
       }
       const result = await judgeOne(task);
       await mq.publish(config.mq.resultQueue, result);
     }).then((stopFn) => {
       stops.push(stopFn);
-      console.log(`[judge] worker listening on ${config.mq.taskQueue}`);
+      log.info("worker listening", { queue: config.mq.taskQueue });
       return stopFn;
     }).catch((err) => {
-      console.error("[judge] worker start failed:", err.message);
+      log.error("worker start failed", { queue: config.mq.taskQueue, error: err });
       return null;
     });
   }
@@ -321,6 +355,7 @@ export function createJudgeService(app, { problems, resultHub }) {
   /** 结果落库：MySQL + LSM + 中间件成绩 + 内存事件。 */
   async function consumeResult(result) {
     const taskId = result.task_id;
+    logger.setContext({ task_id: taskId });
     const meta = resultHub.getMeta(taskId) || {};
 
     if (result.status === "judging" || result.status === "pending") {
@@ -342,7 +377,7 @@ export function createJudgeService(app, { problems, resultHub }) {
         const ai = await app.services.ai.judgeEvent(merged);
         if (ai) merged.ai_message = ai;
       } catch (err) {
-        console.warn("[judge] ai event failed:", err.message);
+        log.warn("ai event failed", { task_id: taskId, error: err });
       }
     }
 
@@ -357,7 +392,7 @@ export function createJudgeService(app, { problems, resultHub }) {
           timeMs: merged.cpu_ms || 0,
         }, meta.token);
       } catch (err) {
-        console.warn("[judge] contest score failed:", err.message);
+        log.warn("contest score failed", { task_id: taskId, contest_id: merged.contest_id, error: err });
       }
     }
 
@@ -365,15 +400,24 @@ export function createJudgeService(app, { problems, resultHub }) {
       const rec = await lsm.saveFromResult(merged, meta);
       if (rec) merged.submission_no = `sub_${rec.submitid}`;
     } catch (err) {
-      console.warn("[judge] lsm save failed:", err.message);
+      log.warn("lsm save failed", { task_id: taskId, error: err });
     }
 
     try {
       await finalizeDb(merged, meta);
     } catch (err) {
-      console.warn("[judge] db finalize failed:", err.message);
+      log.warn("db finalize failed", { task_id: taskId, error: err });
     }
 
+    log.info("result finalized", {
+      task_id: taskId,
+      status: merged.status,
+      username: merged.username,
+      problem_id: merged.problem_id,
+      ac_count: merged.ac_count || 0,
+      total_cases: merged.total_cases || 0,
+      submission_no: merged.submission_no || "",
+    });
     resultHub.push(taskId, merged);
   }
 
@@ -409,10 +453,10 @@ export function createJudgeService(app, { problems, resultHub }) {
     mq.consumeResults((result) => consumeResult(result))
       .then((stopFn) => {
         stops.push(stopFn);
-        console.log(`[judge] result consumer listening on ${config.mq.resultQueue}`);
+        log.info("result consumer listening", { queue: config.mq.resultQueue });
       })
       .catch((err) => {
-        console.error("[judge] result consumer start failed:", err.message);
+        log.error("result consumer start failed", { queue: config.mq.resultQueue, error: err });
       });
 
     return stopAll;

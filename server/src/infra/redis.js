@@ -1,4 +1,7 @@
 import Redis from "ioredis";
+import { logger } from "../core/logger.js";
+
+const log = logger.child("redis");
 
 /**
  * 真 Redis（6382）：两类数据
@@ -21,7 +24,7 @@ export function createRedis(config) {
   function get() {
     if (!client) {
       client = new Redis(opts);
-      client.on("error", (err) => console.error("[redis]", err.message));
+      client.on("error", (err) => log.error("redis client error", { error: err }));
     }
     return client;
   }
@@ -30,7 +33,7 @@ export function createRedis(config) {
     try {
       return await fn(get());
     } catch (err) {
-      console.warn("[redis] degraded:", err.message);
+      log.warn("redis degraded, using fallback", { error: err });
       return fallback;
     }
   }
@@ -63,7 +66,7 @@ export function createRedis(config) {
           files[name] = Buffer.from(b64, "base64");
         }
         await r.zadd("pdata:lru", Date.now(), String(problemId));
-        console.log(`[pd-lru] problem ${problemId} HIT (${Object.keys(files).length} files)`);
+        log.debug("test data cache hit", { problem_id: problemId, files: Object.keys(files).length });
         return files;
       }, null);
     },
@@ -84,7 +87,7 @@ export function createRedis(config) {
           for (const pid of old) {
             await r.del(`pdata:${pid}`);
             await r.zrem("pdata:lru", pid);
-            console.log(`[pd-lru] evict problem ${pid}`);
+            log.debug("test data cache evicted", { problem_id: pid });
           }
         }
         return true;

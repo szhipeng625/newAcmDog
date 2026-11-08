@@ -1,4 +1,7 @@
 import net from "node:net";
+import { logger } from "../core/logger.js";
+
+const log = logger.child("lsm");
 
 /**
  * LSM-KV 客户端（6380）。
@@ -147,7 +150,7 @@ export function createLsm(config) {
     };
 
     const ok = await saveRecord(rec);
-    console.log(`[lsm] saved submitid=${rec.submitid} status=${status}`);
+    log.info("submission persisted", { submitid: rec.submitid, status });
     return ok ? rec : null;
   }
 

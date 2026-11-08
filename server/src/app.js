@@ -3,6 +3,7 @@ import bodyParser from "koa-bodyparser";
 import { config } from "./config.js";
 import { enablePlugins } from "./core/plugins.js";
 import { httpMiddleware } from "./core/http.js";
+import { accessLog } from "./core/accessLog.js";
 import { createInfra } from "./infra/index.js";
 import { createServices } from "./services/index.js";
 import { createRoutes } from "./routes/index.js";
@@ -13,6 +14,8 @@ export async function createApp() {
   app.config = config;
   enablePlugins(app);
 
+  // 访问日志放最外层，request_id 通过 AsyncLocalStorage 透传给后续所有日志
+  if (config.log.access) app.use(accessLog({ slowMs: config.log.slowMs }));
   app.use(httpMiddleware());
   app.use(bodyParser({ enableTypes: ["json"], jsonLimit: "4mb" }));
 

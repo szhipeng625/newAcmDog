@@ -1,5 +1,8 @@
 import { badRequest, notFound, upstream } from "../core/http.js";
+import { logger } from "../core/logger.js";
 import { buildContestPdf } from "./contestPdf.js";
+
+const log = logger.child("contest");
 
 /**
  * 竞赛服务。
@@ -86,7 +89,7 @@ export function createContestService(app, { problems }) {
     try {
       nav = await problems.navList();
     } catch (err) {
-      console.warn("[contest] nav list failed:", err.message);
+      log.warn("nav list failed", { error: err });
     }
     const byId = new Map(nav.map((p) => [String(p.id), p]));
 
@@ -108,7 +111,7 @@ export function createContestService(app, { problems }) {
       try {
         p = await problems.meta(pid);
       } catch (err) {
-        console.warn(`[contest] problem ${pid} load failed:`, err.message);
+        log.warn("problem load failed", { problem_id: pid, error: err });
       }
       full.push(p || { id: pid, title: `题目 ${pid}`, description: "" });
     }
@@ -139,6 +142,7 @@ export function createContestService(app, { problems }) {
    */
   async function sendControl(type, cid) {
     await mq.publishTask({ type, contest_id: String(cid) });
+    log.info("control message published", { type, contest_id: cid });
   }
 
   async function dataPrepare(cid) {
@@ -154,7 +158,7 @@ export function createContestService(app, { problems }) {
     try {
       await middleware.boardPersist({ contestId: cid });
     } catch (err) {
-      console.warn("[contest] board persist failed:", err.message);
+      log.warn("board persist failed", { contest_id: cid, error: err });
     }
     return { sent: true };
   }

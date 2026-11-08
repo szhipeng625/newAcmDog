@@ -1,5 +1,8 @@
 import { httpJson } from "../infra/httpClient.js";
 import { upstream } from "../core/http.js";
+import { logger } from "../core/logger.js";
+
+const log = logger.child("ai");
 
 /**
  * AI 相关代理：
@@ -29,7 +32,7 @@ export function createAiService(app) {
       if (data && data.reply) return { reply: data.reply, status: result.status };
       return null;
     } catch (err) {
-      console.warn("[ai] judge_event failed:", err.message);
+      log.warn("judge_event failed", { error: err });
       return null;
     }
   }
@@ -41,7 +44,7 @@ export function createAiService(app) {
       method: "POST",
       timeoutMs: 5000,
       body: { username },
-    }).catch((err) => console.warn("[ai] vh_info failed:", err.message));
+    }).catch((err) => log.warn("vh_info failed", { error: err }));
   }
 
   async function animeStatus() {

@@ -1,5 +1,8 @@
 import { badRequest, forbidden, notFound } from "../core/http.js";
+import { logger } from "../core/logger.js";
 import { makeStoreKey } from "./judgeService.js";
+
+const log = logger.child("submission");
 
 /**
  * 提交记录服务：列表 / 测试点明细 / 完整详情。
@@ -147,7 +150,7 @@ export function createSubmissionService(app, { resultHub, auth }) {
         item.obj_uri = str(reg[0].obj_uri);
       }
     } catch (err) {
-      console.warn("[submission] store lookup failed:", err.message);
+      log.warn("submission store lookup failed", { task_id: taskId, error: err });
     }
 
     return item;

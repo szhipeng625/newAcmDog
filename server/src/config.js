@@ -6,6 +6,18 @@ const num = (v, d) => {
 const str = (v, d) => (v === undefined || v === null || v === "" ? d : String(v));
 
 export const config = {
+  // 日志：默认控制台 + logs/server.log；LOG_DIR 显式置空即可关闭文件输出
+  log: {
+    level: str(process.env.LOG_LEVEL, "info"),           // debug | info | warn | error
+    format: str(process.env.LOG_FORMAT, "text"),         // text | json
+    dir: process.env.LOG_DIR === undefined ? "logs" : String(process.env.LOG_DIR),
+    file: str(process.env.LOG_FILE, "server.log"),
+    maxBytes: num(process.env.LOG_MAX_BYTES, 10 * 1024 * 1024),
+    maxFiles: num(process.env.LOG_MAX_FILES, 5),
+    access: str(process.env.LOG_ACCESS, "on") !== "off",
+    slowMs: num(process.env.LOG_SLOW_MS, 1000),
+  },
+
   http: {
     host: str(process.env.HOST, "127.0.0.1"),
     port: num(process.env.PORT, 18081),

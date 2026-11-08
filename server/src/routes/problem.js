@@ -1,4 +1,7 @@
 import { HttpError, badRequest, upstream } from "../core/http.js";
+import { logger } from "../core/logger.js";
+
+const log = logger.child("problem");
 
 /** 题目列表 / 题面 / 热门题。 */
 export default function register(router, app) {
@@ -11,7 +14,7 @@ export default function register(router, app) {
     try {
       list = await problems.navList();
     } catch (err) {
-      console.warn("[problem] nav list failed:", err.message);
+      log.warn("nav list failed", { error: err });
     }
     ctx.body = list.filter((p) => p.isPublic);
   });
