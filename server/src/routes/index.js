@@ -5,6 +5,7 @@ import judgeRoutes from "./judge.js";
 import submissionRoutes from "./submission.js";
 import contestRoutes from "./contest.js";
 import animeRoutes from "./anime.js";
+import adminRoutes from "./admin.js";
 
 /**
  * 路由表。保持与原 Python 服务完全一致的 21 个端点，前端不用改。
@@ -20,6 +21,7 @@ const GROUPS = [
   contestRoutes,    // GET  /api/cloud_contests /cloud_contest /cloud_contest_pdf /cloud_contest_board
                     // POST /api/cloud_contest_register /cloud_contest_data_prepare /cloud_contest_data_cleanup
   animeRoutes,      // GET  /api/anime/status, POST /api/anime/toggle, /api/anime/generate
+  adminRoutes,      // GET  /api/admin/users, /api/admin/problems, /api/admin/submissions; POST /api/admin/users/role, /api/admin/problems/toggle_public
 ];
 
 export function createRoutes(app) {

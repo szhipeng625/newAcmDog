@@ -12,6 +12,9 @@ import Register from './pages/Register.jsx'
 import Profile from './pages/Profile.jsx'
 import Author from './pages/Author.jsx'
 import HotProblems from './pages/HotProblems.jsx'
+import AdminUsers from './pages/AdminUsers.jsx'
+import AdminProblems from './pages/AdminProblems.jsx'
+import AdminSubmissions from './pages/AdminSubmissions.jsx'
 
 export default function App() {
   return (
@@ -29,6 +32,9 @@ export default function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/author" element={<Author />} />
         <Route path="/hot-problems" element={<HotProblems />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/problems" element={<AdminProblems />} />
+        <Route path="/admin/submissions" element={<AdminSubmissions />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

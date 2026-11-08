@@ -82,5 +82,11 @@ export const api = {
   aiMessages: (token) => request('/api/ai/messages', { token }),
   aiChat: (message) => request('/api/ai/chat', { method: 'POST', body: { message } }),
   aiJudgeEvent: (body) => request('/api/ai/judge_event', { method: 'POST', body }),
+  // 后台管理
+  adminUsers: (keyword = '') => request(`/api/admin/users?keyword=${encodeURIComponent(keyword)}`),
+  adminSetRole: (id, role) => request('/api/admin/users/role', { method: 'POST', body: { id, role } }),
+  adminProblems: () => request('/api/admin/problems'),
+  adminTogglePublic: (id, isPublic) => request('/api/admin/problems/toggle_public', { method: 'POST', body: { id, isPublic } }),
+  adminSubmissions: (username = '', status = '') => request(`/api/admin/submissions?username=${encodeURIComponent(username)}&status=${encodeURIComponent(status)}`),
 }
 

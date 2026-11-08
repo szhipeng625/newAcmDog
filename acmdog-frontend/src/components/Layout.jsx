@@ -15,6 +15,7 @@ const navItems = [
 
 export default function Layout() {
   const [logged, setLogged] = useState(isLoggedIn())
+  const [role, setRole] = useState('')
   const [checking, setChecking] = useState(true)
   const navigate = useNavigate()
 
@@ -35,6 +36,7 @@ export default function Layout() {
           setLogged(false)
         } else {
           setLogged(true)
+          setRole(d?.role || 'user')
         }
       })
       .catch(() => {
@@ -71,6 +73,9 @@ export default function Layout() {
                 {item.label}
               </NavLink>
             ))}
+            {role === 'admin' && (
+              <NavLink to="/admin/users" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>后台</NavLink>
+            )}
           </nav>
           <div className="topbar-actions">
             {checking ? null : logged ? (
