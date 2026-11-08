@@ -26,6 +26,22 @@ export default function register(router, app) {
     } catch (err) {
       throw new HttpError(400, err.message);
     }
+    // 注册成功后自动登录，返回与 /api/cloud_login 一致的 token 结构，前端无需二次登录
+    if (data && data.ok) {
+      try {
+        const loginData = await middleware.login({
+          username: body.username,
+          password: body.password,
+        });
+        if (loginData && loginData.token) {
+          ctx.body = loginData;
+          if (body.username) ai.vhInit(body.username);
+          return;
+        }
+      } catch {
+        // 自动登录失败不影响注册结果，回退到原注册响应
+      }
+    }
     ctx.body = data;
     if (data && (data.ok || data.token) && body.username) ai.vhInit(body.username);
   });
