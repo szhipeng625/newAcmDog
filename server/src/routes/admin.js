@@ -7,6 +7,20 @@ export default function register(router, app) {
   const mysql = app.infra.mysql;
   const auth = app.services.auth;
 
+  async function requireStaff(ctx) {
+    const raw = String(ctx.headers.authorization || "");
+    const token = raw.replace(/^Bearer\s+/i, "").trim();
+    if (!token) throw unauthorized("need login");
+    let me;
+    try {
+      me = await auth.whoami(token);
+    } catch (err) {
+      throw unauthorized("login expired");
+    }
+    if (me.role !== "admin" && me.role !== "author") throw new HttpError(403, "need admin or author");
+    return me;
+  }
+
   async function requireAdmin(ctx) {
     const raw = String(ctx.headers.authorization || "");
     const token = raw.replace(/^Bearer\s+/i, "").trim();
@@ -48,7 +62,7 @@ export default function register(router, app) {
   });
 
   router.get("/api/admin/problems", async (ctx) => {
-    await requireAdmin(ctx);
+    await requireStaff(ctx);
     const limit = Math.max(1, Math.min(Number(ctx.query.limit) || 100, 500));
     const rows = await mysql.query(
       "SELECT id, title, difficulty, time_ms, mem_mb, is_public, tags, updated_at FROM problems ORDER BY id DESC LIMIT ?",
@@ -58,7 +72,7 @@ export default function register(router, app) {
   });
 
   router.post("/api/admin/problems/toggle_public", async (ctx) => {
-    await requireAdmin(ctx);
+    await requireStaff(ctx);
     const body = ctx.request.body || {};
     const id = body.id;
     const isPublic = body.isPublic;
@@ -67,8 +81,50 @@ export default function register(router, app) {
     ctx.body = { ok: true };
   });
 
+  router.post("/api/admin/problems", async (ctx) => {
+    await requireStaff(ctx);
+    const b = ctx.request.body || {};
+    if (!b.title) throw badRequest("title required");
+    const tags = Array.isArray(b.tags) ? JSON.stringify(b.tags) : (b.tags || "[]");
+    const res = await mysql.query(
+      "INSERT INTO problems (title, description, sample_in, sample_out, time_ms, mem_mb, tags, is_public, difficulty, judge_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [b.title, b.description || "", b.sample_in || "", b.sample_out || "", Number(b.time_ms) || 1000, Number(b.mem_mb) || 256, tags, b.is_public ? 1 : 0, Number(b.difficulty) || 0, Number(b.judge_mode) || 0],
+    );
+    ctx.body = { ok: true, id: res.insertId };
+  });
+
+  router.put("/api/admin/problems", async (ctx) => {
+    await requireStaff(ctx);
+    const b = ctx.request.body || {};
+    const id = b.id;
+    if (!id) throw badRequest("id required");
+    const sets = [];
+    const args = [];
+    if (b.title !== undefined) { sets.push("title = ?"); args.push(b.title); }
+    if (b.description !== undefined) { sets.push("description = ?"); args.push(b.description); }
+    if (b.time_ms !== undefined) { sets.push("time_ms = ?"); args.push(Number(b.time_ms)); }
+    if (b.mem_mb !== undefined) { sets.push("mem_mb = ?"); args.push(Number(b.mem_mb)); }
+    if (b.tags !== undefined) { sets.push("tags = ?"); args.push(Array.isArray(b.tags) ? JSON.stringify(b.tags) : b.tags); }
+    if (b.is_public !== undefined) { sets.push("is_public = ?"); args.push(b.is_public ? 1 : 0); }
+    if (b.difficulty !== undefined) { sets.push("difficulty = ?"); args.push(Number(b.difficulty)); }
+    if (b.judge_mode !== undefined) { sets.push("judge_mode = ?"); args.push(Number(b.judge_mode)); }
+    if (!sets.length) throw badRequest("nothing to update");
+    sets.push("updated_at = NOW()");
+    args.push(id);
+    await mysql.query("UPDATE problems SET " + sets.join(", ") + " WHERE id = ?", args);
+    ctx.body = { ok: true };
+  });
+
+  router.delete("/api/admin/problems", async (ctx) => {
+    await requireStaff(ctx);
+    const id = Number(ctx.query.id || ctx.request.body && ctx.request.body.id);
+    if (!id) throw badRequest("id required");
+    await mysql.query("DELETE FROM problems WHERE id = ?", [id]);
+    ctx.body = { ok: true };
+  });
+
   router.get("/api/admin/submissions", async (ctx) => {
-    await requireAdmin(ctx);
+    await requireStaff(ctx);
     const limit = Math.max(1, Math.min(Number(ctx.query.limit) || 100, 500));
     const username = String(ctx.query.username || "");
     const status = String(ctx.query.status || "");
@@ -82,5 +138,43 @@ export default function register(router, app) {
     args.push(limit);
     const rows = await mysql.query(sql, args);
     ctx.body = rows.map((r) => Object.assign({}, r, { submit_time: String(r.submit_time) }));
+  });
+
+  // ---------- 比赛管理（admin + author） ----------
+  router.get("/api/admin/contests", async (ctx) => {
+    await requireStaff(ctx);
+    const limit = Math.max(1, Math.min(Number(ctx.query.limit) || 100, 500));
+    const rows = await mysql.query("SELECT id, content FROM contests ORDER BY id DESC LIMIT ?", [limit]);
+    ctx.body = rows.map((r) => {
+      let parsed = {};
+      try { parsed = JSON.parse(r.content || "[]"); } catch { parsed = {}; }
+      return Object.assign({ id: r.id }, parsed);
+    });
+  });
+
+  router.post("/api/admin/contests", async (ctx) => {
+    await requireStaff(ctx);
+    const b = ctx.request.body || {};
+    const content = JSON.stringify(b.content || b);
+    const res = await mysql.query("INSERT INTO contests (content) VALUES (?)", [content]);
+    ctx.body = { ok: true, id: res.insertId };
+  });
+
+  router.put("/api/admin/contests", async (ctx) => {
+    await requireStaff(ctx);
+    const b = ctx.request.body || {};
+    const id = b.id;
+    if (!id) throw badRequest("id required");
+    const content = JSON.stringify(b.content || b);
+    await mysql.query("UPDATE contests SET content = ? WHERE id = ?", [content, id]);
+    ctx.body = { ok: true };
+  });
+
+  router.delete("/api/admin/contests", async (ctx) => {
+    await requireStaff(ctx);
+    const id = Number(ctx.query.id || (ctx.request.body && ctx.request.body.id));
+    if (!id) throw badRequest("id required");
+    await mysql.query("DELETE FROM contests WHERE id = ?", [id]);
+    ctx.body = { ok: true };
   });
 }

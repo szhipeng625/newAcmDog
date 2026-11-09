@@ -787,3 +787,21 @@
 2026-11-08T23:54:17.096Z INFO  [judge] result consumer listening {"queue":"oj.judge.result"}
 2026-11-08T23:54:18.333Z WARN  [http] request failed {"request_id":"1b84ca9a-c68","method":"GET","path":"/api/admin/users","status":401,"duration_ms":9.72,"ip":"127.0.0.1","bytes":22}
 2026-11-08T23:58:18.528Z WARN  [http] request failed {"request_id":"b2a7fc13-cc0","method":"GET","path":"/api/admin/users","status":403,"duration_ms":1512.6,"ip":"127.0.0.1","bytes":22,"slow":true}
+2026-11-09T00:20:54.858Z WARN  [http] request completed {"request_id":"f7fdd83a-4a5","method":"GET","path":"/api/cloud_problems","status":200,"duration_ms":1289.66,"ip":"","bytes":16103,"slow":true}
+2026-11-09T00:20:55.629Z INFO  [http] request completed {"request_id":"86ecdaf5-665","method":"GET","path":"/api/cloud_problems","status":200,"duration_ms":19.13,"ip":"127.0.0.1","bytes":16103}
+2026-11-09T00:20:57.130Z WARN  [http] request completed {"request_id":"97f1e4d5-73b","method":"GET","path":"/api/cloud_whoami","status":200,"duration_ms":1515.41,"ip":"127.0.0.1","bytes":136,"slow":true}
+2026-11-09T00:20:59.058Z WARN  [http] request completed {"request_id":"9a4b5c04-5cc","method":"GET","path":"/api/cloud_whoami","status":200,"duration_ms":5019.02,"ip":"","bytes":136,"slow":true}
+2026-11-09T00:21:12.277Z WARN  [http] request completed {"request_id":"ed441162-136","method":"POST","path":"/api/cloud_login","status":200,"duration_ms":1480.23,"ip":"127.0.0.1","bytes":11042,"slow":true}
+2026-11-09T00:21:15.605Z INFO  [http] request completed {"request_id":"7c969ac1-75b","method":"GET","path":"/api/cloud_problems","status":200,"duration_ms":199.37,"ip":"127.0.0.1","bytes":16103}
+2026-11-09T00:22:04.338Z INFO  [http] request completed {"request_id":"428915dd-210","method":"GET","path":"/api/cloud_whoami","status":200,"duration_ms":351.28,"ip":"127.0.0.1","bytes":10999}
+2026-11-09T00:22:16.757Z WARN  [http] request completed {"request_id":"7005db54-45e","method":"GET","path":"/api/cloud_whoami","status":200,"duration_ms":1391.31,"ip":"127.0.0.1","bytes":10999,"slow":true}
+2026-11-09T00:22:33.732Z INFO  [http] request completed {"request_id":"fad6b88a-9c1","method":"POST","path":"/api/cloud_login","status":200,"duration_ms":233.39,"ip":"127.0.0.1","bytes":177}
+2026-11-09T00:22:38.111Z INFO  [http] request completed {"request_id":"2f142689-c47","method":"GET","path":"/api/cloud_whoami","status":200,"duration_ms":190.55,"ip":"127.0.0.1","bytes":134}
+2026-11-09T00:22:50.549Z INFO  [http] request completed {"request_id":"63746461-f02","method":"POST","path":"/api/cloud_login","status":200,"duration_ms":192.45,"ip":"127.0.0.1","bytes":11042}
+2026-11-09T00:22:54.492Z INFO  [http] request completed {"request_id":"071ebf2c-f98","method":"GET","path":"/api/cloud_whoami","status":200,"duration_ms":129.34,"ip":"127.0.0.1","bytes":10999}
+2026-11-09T00:35:56.092Z INFO  [server] shutting down {"signal":"SIGTERM"}
+2026-11-09T00:35:58.612Z INFO  [plugin] plugin registered {"plugin":"local"}
+2026-11-09T00:35:58.705Z INFO  [server] listening {"url":"http://127.0.0.1:18081","sandbox":"local","languages":"c,cpp,cc,python,java,go","log_level":"info","log_format":"text","log_file":"logs/server.log"}
+2026-11-09T00:35:58.838Z INFO  [judge] result consumer listening {"queue":"oj.judge.result"}
+2026-11-09T00:37:45.395Z WARN  [http] request failed {"request_id":"c6b24209-cef","method":"POST","path":"/api/admin/problems","status":403,"duration_ms":347.47,"ip":"127.0.0.1","bytes":32}
+2026-11-09T00:37:45.502Z WARN  [http] request failed {"request_id":"e44ef859-1a0","method":"POST","path":"/api/admin/contests","status":403,"duration_ms":73.42,"ip":"127.0.0.1","bytes":32}

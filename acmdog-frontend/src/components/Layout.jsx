@@ -76,6 +76,9 @@ export default function Layout() {
             {role === 'admin' && (
               <NavLink to="/admin/users" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>后台</NavLink>
             )}
+            {(role === 'admin' || role === 'author') && (
+              <NavLink to="/admin/problems" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>管理</NavLink>
+            )}
           </nav>
           <div className="topbar-actions">
             {checking ? null : logged ? (

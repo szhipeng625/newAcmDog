@@ -88,5 +88,14 @@ export const api = {
   adminProblems: () => request('/api/admin/problems'),
   adminTogglePublic: (id, isPublic) => request('/api/admin/problems/toggle_public', { method: 'POST', body: { id, isPublic } }),
   adminSubmissions: (username = '', status = '') => request(`/api/admin/submissions?username=${encodeURIComponent(username)}&status=${encodeURIComponent(status)}`),
+  // 题目管理（admin + author）
+  adminCreateProblem: (body) => request('/api/admin/problems', { method: 'POST', body }),
+  adminUpdateProblem: (body) => request('/api/admin/problems', { method: 'PUT', body }),
+  adminDeleteProblem: (id) => request(`/api/admin/problems?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  // 比赛管理（admin + author）
+  adminContests: () => request('/api/admin/contests'),
+  adminCreateContest: (body) => request('/api/admin/contests', { method: 'POST', body }),
+  adminUpdateContest: (body) => request('/api/admin/contests', { method: 'PUT', body }),
+  adminDeleteContest: (id) => request(`/api/admin/contests?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 

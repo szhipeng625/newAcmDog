@@ -15,6 +15,7 @@ import HotProblems from './pages/HotProblems.jsx'
 import AdminUsers from './pages/AdminUsers.jsx'
 import AdminProblems from './pages/AdminProblems.jsx'
 import AdminSubmissions from './pages/AdminSubmissions.jsx'
+import AdminContests from './pages/AdminContests.jsx'
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/problems" element={<AdminProblems />} />
         <Route path="/admin/submissions" element={<AdminSubmissions />} />
+        <Route path="/admin/contests" element={<AdminContests />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
