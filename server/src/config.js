@@ -25,6 +25,13 @@ export const config = {
     resultTtlMs: num(process.env.RESULT_TTL_MS, 600_000),
   },
 
+  // 开发调试开关：把判题 Worker 跑在 Koa 进程内，便于本机一条命令跑通
+  // 提交 → oj.judge → 判题 → oj.judge.result → 结果回流。
+  // 生产必须关闭，由独立的 eval-worker / Python Worker 进程消费 oj.judge，避免双消费者抢任务。
+  dev: {
+    inlineWorker: str(process.env.JUDGE_INLINE_WORKER, "off") === "on",
+  },
+
   mq: {
     url: str(process.env.AMQP_URL, "amqp://127.0.0.1:5672"),
     taskQueue: "oj.judge",

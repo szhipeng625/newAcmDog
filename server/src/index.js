@@ -24,7 +24,18 @@ const server = app.listen(config.http.port, config.http.host, () => {
 });
 
 // 结果消费者常驻：把 MQ 里的判题结果写回内存 + MySQL + LSM。
+// 返回值是 stopAll()：关闭时会把下面所有后台消费者（含 inline worker）一起停掉。
 const stopConsumer = app.services.judge.startResultConsumer();
+
+// 开发模式：同进程消费 oj.judge。默认关闭，只在需要本机联调时打开。
+// startWorker() 内部会把自己的关闭函数注册进共享 stops，无需在此单独处理。
+if (config.dev.inlineWorker) {
+  app.services.judge.startWorker();
+  log.warn("inline judge worker enabled (development only)", {
+    queue: config.mq.taskQueue,
+    sandbox: app.sandbox.name,
+  });
+}
 
 let closing = false;
 async function shutdown(signal) {

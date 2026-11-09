@@ -17,10 +17,13 @@ export default defineConfig({
     },
   },
   server: {
+    // 固定监听 IPv4：Windows 上 Vite 默认可能只监听 [::1]，
+    // 导致 127.0.0.1:5173 打不开、调试器连不上。
+    host: '127.0.0.1',
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://www.acmdog.cn',
+        target: 'http://127.0.0.1:18081',
         changeOrigin: true,
       },
     },
